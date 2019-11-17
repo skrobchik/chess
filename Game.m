@@ -3,6 +3,8 @@ classdef Game
         Board
         GameState
         Figure
+        MoveIndicator
+        SelectedPieceCoord
     end
     
     methods
@@ -18,6 +20,12 @@ classdef Game
                 'WhiteEnPassant', false,...
                 'BlackEnPassant', false);
             obj.Figure = figure;
+            pseudo_x = [1 2];
+            pseudo_y = [1 2];
+            obj.MoveIndicator = plot(pseudo_x, pseudo_y, 'o');
+            obj.MoveIndicator.XData = [];
+            obj.MoveIndicator.YData = [];
+            obj.SelectedPieceCoord = [];
             obj.Figure.WindowButtonDownFcn = {@Game.board_click, obj};
         end
         
@@ -34,7 +42,7 @@ classdef Game
             %MOVE Summary of this function goes here
             %   Detailed explanation goes here
             self.set_piece(end_coords, self.get_piece(start_coords));
-            self.set_piece(self.Board, start_coords,{});
+            self.set_piece(start_coords, {});
         end
         
         function [moves] = get_piece_moves(self, coords)
@@ -98,15 +106,29 @@ classdef Game
                 if ~Game.is_in_bounds(move)
                     continue;
                 end
-                move_board = move_piece(board, coords, move);
-                if self.is_king_checked(move_board, color)
-                    continue;
-                end
-                target = self.get_piece( move);
+                target = self.get_piece(move);
                 if ~isempty(target)
                     if target.Color == color
                         continue;
                     end
+                end
+                filtered_moves = [filtered_moves; move];
+            end
+            moves = filtered_moves;
+        end
+        
+        function [moves] = get_piece_legal_moves(self, coords)
+            moves = self.get_piece_moves(coords);
+            filtered_moves = [];
+            for i = 1:size(moves,1)
+                move = moves(i,:);
+                self.move_piece(coords, move);
+                posible_eat_piece = self.get_piece(move);
+                is_checked = self.is_king_checked(color);
+                self.move_piece(move, coords);
+                self.set_piece(move, posible_eat_piece);
+                if is_checked
+                    continue;
                 end
                 filtered_moves = [filtered_moves; move];
             end
@@ -159,7 +181,7 @@ classdef Game
                 walk_coord = coords;
                 while true
                     walk_coord = walk_coord + move_directions(i,:);
-                    if ~is_in_bounds(walk_coord)
+                    if ~Game.is_in_bounds(walk_coord)
                         break
                     end
                     if ~isempty(self.get_piece(walk_coord))
@@ -171,8 +193,37 @@ classdef Game
         end
         
         function [is_checked] = is_king_checked(self, color)
-            %IS_KING_CHECKED Summary of this function goes here
-            %   Detailed explanation goes here
+            is_checked = true;
+            opp_color = Game.opposite_color(color);
+            king_pos = [];
+            for i = 1:8
+                for j = 1:8
+                    piece = self.get_piece([i j]);
+                    if isempty(piece)
+                        continue
+                    end
+                    if piece.PieceType == 'k' && piece.Color == color
+                        king_pos = [i j];
+                        break;
+                    end
+                end
+            end
+            for i = 1:8
+                for j = 1:8
+                    piece = self.get_piece([i j]);
+                    if isempty(piece)
+                        continue
+                    end
+                    if piece.Color == opp_color
+                        moves = self.get_piece_legal_moves([i j]);
+                        for k = 1:length(moves)
+                            if moves(k) == king_pos
+                                return;
+                            end
+                        end
+                    end
+                end
+            end
             is_checked = false;
         end
     end
@@ -229,14 +280,41 @@ classdef Game
             axes = fig.Children;
             axes.Units = 'Pixels';
             axes_pos = axes.Position;
-            axes_width = axes_pos(3) - axes_pos(1);
-            axes_height = axes_pos(4) - axes_pos(2);
+            axes_width = 9/8*(axes_pos(3) - axes_pos(1));
+            axes_height = 9/8*(axes_pos(4) - axes_pos(2)); % I have no clue why coords are off :/
             relative_mouse_pos = mouse_pos - axes_pos(1:2) - fig_pos(1:2);
             mouse_coord = round(8*[relative_mouse_pos(2)/axes_height, relative_mouse_pos(1)/axes_width]);
-            moves = self.get_piece_moves(mouse_coord);
-            if ~isempty(moves)
-                plot(moves(:,2),moves(:,1),'o');
+            
+            if isempty(self.SelectedPieceCoord)
+                moves = self.get_piece_moves(mouse_coord);
+                if isempty(moves)
+                    return
+                end
+                l = self.MoveIndicator;
+                l.XData = moves(:,2);
+                l.YData = moves(:,1);
+                self.SelectedPieceCoord = mouse_coord;
+            else
+                moves = self.get_piece_moves(self.SelectedPieceCoord);
+                self.MoveIndicator.XData = [];
+                self.MoveIndicator.YData = [];
+                for i = 1:length(moves)
+                    if mouse_coord == moves(i)
+                        self.move_piece(self.SelectedPieceCoord, mouse_coord);
+                        self.SelectedPieceCoord = [];
+                        return;
+                    end
+                end
+                moves = self.get_piece_moves(mouse_coord);
+                if isempty(moves)
+                    return
+                end
+                l = self.MoveIndicator;
+                l.XData = moves(:,2);
+                l.YData = moves(:,1);
+                self.SelectedPieceCoord = mouse_coord;
             end
+                        
         end
         
     end
