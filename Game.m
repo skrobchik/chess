@@ -1,4 +1,4 @@
-classdef Game
+classdef Game < handle
     properties
         Board
         GameState
@@ -9,7 +9,8 @@ classdef Game
     
     methods
         function obj = Game()
-            obj.Board = Game.new_board();
+            obj.Figure = figure;
+            obj.new_board();
             obj.GameState = struct(...
                 'WhiteARookMove', false,...
                 'BlackARookMove', false,...
@@ -19,9 +20,9 @@ classdef Game
                 'BlackKingMove', false,...
                 'WhiteEnPassant', false,...
                 'BlackEnPassant', false);
-            obj.Figure = figure;
             pseudo_x = [1 2];
             pseudo_y = [1 2];
+            hold;
             obj.MoveIndicator = plot(pseudo_x, pseudo_y, 'o');
             obj.MoveIndicator.XData = [];
             obj.MoveIndicator.YData = [];
@@ -29,10 +30,67 @@ classdef Game
             obj.Figure.WindowButtonDownFcn = {@Game.board_click, obj};
         end
         
+        function [] = new_board(self)
+            piece_array = ['r' 'n' 'b' 'q' 'k' 'b' 'n' 'r'];
+            self.Board = cell(8,8);
+            for i = 1:8
+                for j = 1:8
+                    if (2 < i) && (i < 7)
+                        break;
+                    end
+                    piece = struct(...
+                        'PieceType', '',...
+                        'Color', '',...
+                        'Line', []);
+                    if i == 1 || i == 2
+                        piece.Color = 'w';
+                    end
+                    if i == 7 || i == 8
+                        piece.Color = 'b';
+                    end
+                    if i == 1 || i == 8
+                        piece.PieceType = piece_array(j);
+                    end
+                    if i == 2 || i == 7
+                        piece.PieceType = 'p';
+                    end
+                    self.Board(i,j) = {piece};
+                    piece.Line = self.create_piece_line([i j]);
+                end
+            end 
+        end
+        
+        function [l] = create_piece_line(self, coords)
+            figure(self.Figure);
+            piece = self.get_piece(coords);
+            piece_type = piece.PieceType;
+            p = [];
+            switch piece_type
+                case 'p'
+                    p = [0,-0.950;0,-0.9;0.4,-0.350;0.3,-0.250;0.3,-0.1;0.4,0;0.550,0;0.650,-0.1;0.650,-0.250;0.550,-0.350;0.950,-0.9;0.950,-0.950;0,-0.950];
+                case 'r'
+                    p = [0,-0.950;0,-0.8;0.3,-0.8;0.3,-0.250;0,-0.250;0,0;0.150,0;0.150,-0.1;0.4,-0.1;0.4,0;0.550,0;0.550,-0.1;0.8,-0.1;0.8,0;0.950,0;0.950,-0.250;0.650,-0.250;0.650,-0.8;0.950,-0.8;0.950,-0.950;0,-0.950];
+                case 'b'
+                    p = [0,-0.950;0.4,-0.550;0.350,-0.4;0.350,-0.150;0.450,0;0.5,0;0.6,-0.150;0.6,-0.250;0.5,-0.250;0.6,-0.250;0.6,-0.4;0.550,-0.550;0.4,-0.550;0.550,-0.550;0.950,-0.950;0,-0.950];
+                case 'n'
+                    p = [0,-0.950;0.05,-0.8;0.250,-0.8;0.550,-0.250;0.150,-0.3;0.150,-0.150;0.4,0;0.5,0;0.5,-0.150;0.5,0;0.8,0;0.850,-0.05;0.850,-0.8;0.250,-0.8;0.9,-0.8;0.950,-0.950;0,-0.950];
+                case 'k'
+                    p = [0,-0.950;0.4,-0.5;0.3,-0.4;0.4,-0.3;0.450,-0.3;0.450,-0.150;0.350,-0.150;0.350,-0.1;0.450,-0.1;0.450,0;0.5,0;0.5,-0.1;0.6,-0.1;0.6,-0.150;0.5,-0.150;0.5,-0.3;0.450,-0.3;0.550,-0.3;0.650,-0.4;0.550,-0.5;0.4,-0.5;0.550,-0.5;0.950,-0.950;0,-0.950];
+                case 'q'
+                    p = [0,-0.950;0.350,-0.750;0.450,-0.750;0.450,-0.350;0.4,-0.350;0.350,-0.3;0.4,-0.250;0.4,-0.2;0.350,-0.150;0.350,-0.1;0.450,0;0.5,0;0.6,-0.1;0.6,-0.150;0.550,-0.2;0.550,-0.250;0.6,-0.3;0.550,-0.350;0.450,-0.350;0.5,-0.350;0.5,-0.750;0.950,-0.950;0,-0.950];
+            end
+            p(:,1) = p(:,1) + coords(2);
+            p(:,2) = p(:,2) + coords(1);
+            l = line(p(:,1), p(:,2));
+            l.Color = [0 0 0];
+            l.LineJoin = 'round';
+            l.LineWidth = 1;
+        end
+        
         function [piece] = get_piece(self, coords)
             cell = self.Board(coords(1), coords(2));
             piece = cell{1};
-        end
+        end     
         
         function [] = set_piece(self, coords, val)
             self.Board(coords(1),coords(2)) = {val};
@@ -135,46 +193,6 @@ classdef Game
             moves = filtered_moves;
         end
         
-        function [] = draw_board(self)
-            hold on;
-            for i = 1:8
-                for j = 1:8
-                    coords = [i j];
-                    
-                    draw_piece(self, coords);
-                end
-            end
-        end
-        
-        function [l] = draw_piece(self, coords )
-            figure(self.Figure);
-            piece = self.get_piece(coords);
-            if isempty(piece)
-                return
-            end
-            p = [];
-            piece_type = piece.PieceType;
-            switch piece_type
-                case 'p'
-                    p = [0,-0.950;0,-0.9;0.4,-0.350;0.3,-0.250;0.3,-0.1;0.4,0;0.550,0;0.650,-0.1;0.650,-0.250;0.550,-0.350;0.950,-0.9;0.950,-0.950;0,-0.950];
-                case 'r'
-                    p = [0,-0.950;0,-0.8;0.3,-0.8;0.3,-0.250;0,-0.250;0,0;0.150,0;0.150,-0.1;0.4,-0.1;0.4,0;0.550,0;0.550,-0.1;0.8,-0.1;0.8,0;0.950,0;0.950,-0.250;0.650,-0.250;0.650,-0.8;0.950,-0.8;0.950,-0.950;0,-0.950];
-                case 'b'
-                    p = [0,-0.950;0.4,-0.550;0.350,-0.4;0.350,-0.150;0.450,0;0.5,0;0.6,-0.150;0.6,-0.250;0.5,-0.250;0.6,-0.250;0.6,-0.4;0.550,-0.550;0.4,-0.550;0.550,-0.550;0.950,-0.950;0,-0.950];
-                case 'n'
-                    p = [0,-0.950;0.05,-0.8;0.250,-0.8;0.550,-0.250;0.150,-0.3;0.150,-0.150;0.4,0;0.5,0;0.5,-0.150;0.5,0;0.8,0;0.850,-0.05;0.850,-0.8;0.250,-0.8;0.9,-0.8;0.950,-0.950;0,-0.950];
-                case 'k'
-                    p = [0,-0.950;0.4,-0.5;0.3,-0.4;0.4,-0.3;0.450,-0.3;0.450,-0.150;0.350,-0.150;0.350,-0.1;0.450,-0.1;0.450,0;0.5,0;0.5,-0.1;0.6,-0.1;0.6,-0.150;0.5,-0.150;0.5,-0.3;0.450,-0.3;0.550,-0.3;0.650,-0.4;0.550,-0.5;0.4,-0.5;0.550,-0.5;0.950,-0.950;0,-0.950];
-                case 'q'
-                    p = [0,-0.950;0.350,-0.750;0.450,-0.750;0.450,-0.350;0.4,-0.350;0.350,-0.3;0.4,-0.250;0.4,-0.2;0.350,-0.150;0.350,-0.1;0.450,0;0.5,0;0.6,-0.1;0.6,-0.150;0.550,-0.2;0.550,-0.250;0.6,-0.3;0.550,-0.350;0.450,-0.350;0.5,-0.350;0.5,-0.750;0.950,-0.950;0,-0.950];
-            end
-            p = p + coords * [0 1; 1 0] + [-0.5 0.5];
-            l = plot(p(:,1),p(:,2));
-            l.Color = [0 0 0];
-            l.LineJoin = 'round';
-            l.LineWidth = 1;
-        end
-        
         function [moves] = expand_moves_in_move_directions(self, coords, move_directions)
             moves = [];
             for i = 1:size(move_directions,1)
@@ -228,34 +246,7 @@ classdef Game
         end
     end
     
-    methods(Static)
-        function [board] = new_board()
-            piece_array = ['r' 'n' 'b' 'q' 'k' 'b' 'n' 'r'];
-            board = cell(8,8);
-            for i = 1:8
-                for j = 1:8
-                    if (2 < i) && (i < 7)
-                        break;
-                    end
-                    piece = struct(...
-                        'PieceType', '',...
-                        'Color', '');
-                    if i == 1 || i == 2
-                        piece.Color = 'w';
-                    end
-                    if i == 7 || i == 8
-                        piece.Color = 'b';
-                    end
-                    if i == 1 || i == 8
-                        piece.PieceType = piece_array(j);
-                    end
-                    if i == 2 || i == 7
-                        piece.PieceType = 'p';
-                    end
-                    board(i,j) = {piece};
-                end
-            end 
-        end
+    methods(Static) 
         
         function [opp_color] = opposite_color(color)
             opp_color = 'b';
@@ -302,6 +293,10 @@ classdef Game
                     if mouse_coord == moves(i)
                         self.move_piece(self.SelectedPieceCoord, mouse_coord);
                         self.SelectedPieceCoord = [];
+                        piece = self.get_piece(mouse_coord);
+                        delta_coord = self.mouse_coord - self.SelectedPieceCoord;
+                        piece.Line.XData = piece.Line.XData + delta_coord(2);
+                        piece.Line.YData = piece.Line.YData + delta_coord(1);
                         return;
                     end
                 end
